@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Messages</title>
+    {% load static %}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js" integrity="sha512-894YE6QWD5I59HgZOGReFYm4dnWc1Qt5NtvYSaNcOP+u1T9qYdvdihz0PPSiiqn/+/3e7Jo4EaG7TubfWGUrMQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-pink-200 flex items-center justify-center min-h-screen">
+    <div class="bg-yellow-100 rounded-lg p-6 flex flex-col items-center justify-center w-full max-w-4xl shadow-lg">
+        <h2 class="text-2xl font-bold text-gray-700 mb-4">Chats</h2>
+        <hr class="w-full mb-4">
+        <div class="w-full flex flex-col items-center">
+            <div class="bg-blue-100 rounded-lg p-4 w-full max-h-[60vh] overflow-y-auto mb-4 shadow-inner" id="tasks">
+                <div id="chatContainer" class="flex flex-col space-y-4">
+                    {% for i in messages %}
+                        {% if i.sender != user %}
+                            <div class="bg-green-200 p-4 rounded-lg self-start shadow-md">
+                                <p class="text-gray-800">{{i.message}} <strong class="text-gray-600">- {{i.sender}}</strong></p>
+                            </div>
+                        {% else %}
+                            <div class="bg-blue-200 p-4 rounded-lg self-end shadow-md">
+                                <p class="text-gray-800">{{i.message}}</p>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            <form id="message-form" method="POST" class="w-full flex items-center space-x-4">
+                {% csrf_token %}
+                <textarea id="msg" name="message" rows="2" placeholder="Enter your message" required class="w-3/4 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea>
+                <button type="submit" class="w-1/4 bg-green-300 text-gray-700 py-2 rounded-lg hover:bg-green-400 transition duration-300">Send</button>
+            </form>
+        </div>
+    </div>
+</body>
+<script>
+    function scrollToBottom() {
+        var chatContainer = document.getElementById("chatContainer");
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    const websocketProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const wsEndpoint = `${websocketProtocol}://${window.location.host}/ws/notification/{{ room_name }}/`;
+    const socket = new WebSocket(wsEndpoint);
+
+    document.getElementById('message-form').addEventListener('submit', function(event){
+        event.preventDefault();
+        const message = document.getElementById('msg').value;
+        socket.send(JSON.stringify({
+            'message': message,
+            'room_name': '{{ room_name }}',
+            'sender': '{{ user }}',
+        }));
+    });
+
+    socket.addEventListener("message", (event) => {
+        const messageData = JSON.parse(event.data)['message'];
+        
+        var sender = messageData['sender'];
+        var message = messageData['message'];
+
+        if (sender == "{{ user }}"){
+            document.getElementById('msg').value = '';
+        }
+
+        var messageDiv = document.querySelector('#chatContainer');
+        if (sender != "{{ user }}") {
+            messageDiv.innerHTML += '<div class="bg-green-200 p-4 rounded-lg self-start shadow-md"><p class="text-gray-800">' + message + '<strong class="text-gray-600">-' + sender + '</strong></p></div>';
+        } else {
+            messageDiv.innerHTML += '<div class="bg-blue-200 p-4 rounded-lg self-end shadow-md"><p class="text-gray-800">' + message + '</p></div>';
+        }
+        scrollToBottom();
+    });
+
+    socket.onopen = () => {
+        console.log("WebSocket connection opened!");
+    };
+
+    socket.onclose = () => {
+        console.log("WebSocket connection closed!");
+    };
+</script>
+</html>
